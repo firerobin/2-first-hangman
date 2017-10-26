@@ -17,7 +17,7 @@ defmodule Hangman do
     turns_left: 7,
     letters: [],
     used: [],
-    last_guessed: "",
+    last_guess: "",
     word: []
   )
 
@@ -30,42 +30,63 @@ defmodule Hangman do
   end
   
   def tally(%Hangman{} = game) do
-    Map.drop(game, [:last_guessed, :word])
+    Map.drop(game, [:word])
     |> Map.from_struct
     |> IO.inspect
   end
-
-  def guess_valid?(string) do
-    Regex.match?(~r/^[a-zA-Z]$/, string)
+  
+  def make_move(%Hangman{} = state, guess) do
+    true = guess_valid?(guess)
+    match_guess(MapSet.new(state.word) |> MapSet.member?(guess),
+                MapSet.new(state.used) |> MapSet.member?(guess))
+    |> handle_result(guess, state)
   end
 
-  
-  defp match_letter(true, _, {letter, _}), do: letter
-  defp match_letter(false, letters, {_, index}), do: Enum.fetch!(letters, index)
+  defp guess_valid?(string) do
+    Regex.match?(~r/^[a-zA-Z]$/, string)
+  end
   
   defp match_guess(false, false), do: :bad_guess
   defp match_guess(true, false), do: :good_guess
   defp match_guess(_, true), do: :already_used
   
-  defp handle_result(:bad_guess, guess, state) do
-    #Enum.reduce(state.word)
-    %Hangman{state | game_state: :bad_guess, last_guessed: guess, turns_left: state.tally-1}
+  defp update_letters({:ok, guess}, index, guess, %Hangman{word: word, letters: letters} = state) do
+    new_letters = List.replace_at(letters, index, guess)
+    Enum.fetch(word, index + 1) |> update_letters(index + 1, guess, %Hangman{state | letters: new_letters})
   end
   
-  defp handle_result(:good_guess, guess, state) do
-    %Hangman{state | game_state: :bad_guess, last_guessed: guess, turns_left: state.tally-1}
-    #add to used list
+  defp update_letters({:ok, _letter}, index, guess, %Hangman{word: word} = state) do
+    Enum.fetch(word, index + 1) |> update_letters(index + 1, guess, state)
   end
-
-  def make_move(%Hangman{} = game, string) do
   
-    #catch invalid entry
-    true = guess_valid?(string)
-    
-    match_guess(MapSet.new(game.word) |> MapSet.member?(string),
-                MapSet.new(game.used) |> MapSet.member?(string))
-
-   #handle_result(:good_guess, string, %Hangman{} = game)
-
+  defp update_letters(:error, _index, _guess, %Hangman{} = state), do: state    
+  
+  defp handle_result(:bad_guess, guess, %Hangman{used: used, turns_left: turns_left} = state) do
+    new_used = Enum.concat(used, [guess]) |> Enum.sort
+    %Hangman{state | game_state: :bad_guess, last_guess: guess, used: new_used, turns_left: turns_left - 1}
+    |> game_over?
   end
+  
+  defp handle_result(:good_guess, guess, %Hangman{word: word, used: used} = state) do
+    new_used = Enum.concat(used, [guess]) |> Enum.sort
+    new_state = Enum.fetch(word, 0) |> update_letters(0, guess, state)
+    game_over?(%Hangman{new_state | game_state: :good_guess, last_guess: guess, used: new_used})
+  end
+  
+  defp handle_result(:already_used, _guess, %Hangman{} = state) do
+    new_state = %Hangman{state | game_state: :already_used}
+    {new_state, tally(new_state)}
+  end
+  
+  defp game_over?(%Hangman{word: match, letters: match} = state) do
+    new_state = %Hangman{state | game_state: :won}
+    {new_state, tally(new_state)}
+  end
+  
+  defp game_over?(%Hangman{turns_left: 0, word: word} = state) do
+    new_state = %Hangman{state | game_state: :lost, letters: word}
+    {new_state, tally(new_state)}
+  end
+  
+  defp game_over?(%Hangman{} = state), do: {state, tally(state)}
 end
