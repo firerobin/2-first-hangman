@@ -1,17 +1,5 @@
 defmodule Hangman do
-  @moduledoc """
-  Documentation for Hangman.
-  """
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Hangman.hello
-      :world
-
-  """
   defstruct(
     game_state: :initializing,
     turns_left: 7,
