@@ -11,7 +11,7 @@ defmodule Hangman do
 
   def new_game() do
     word = Dictionary.random_word()
-    word = Regex.split(~r{}, word, trim: true) |> List.delete(word, "\r")
+    word = Regex.split(~r{}, word, trim: true) |> List.delete("\r")
     letters = Enum.reduce(word, [], fn (_, acc) -> ["_" | acc] end)
     %Hangman{word: word, letters: letters}
   end
